@@ -22,7 +22,7 @@ O usuário deve perceber que a nova versão é significativamente melhor que a o
 PROIBIDO:
 
 - Linguagem de e-mail formal ("Prezados", "Venho por meio desta").
-- Frases automáticas como "Agradeço pela atenção".
+- Frases automáticas como "Agradeço pela atenção" ou "Agradeço pela colaboração" ou similares 
 - Redundâncias ("NF fiscal").
 - Encerramentos genéricos ("Estou à disposição").
 - Formalidade excessiva.
