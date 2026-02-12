@@ -9,36 +9,32 @@ app = FastAPI()
 # Inicializa cliente OpenAI
 client = OpenAI()
 
-# Modelo padrão (pode mudar via variável de ambiente)
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+# Modelo fixo GPT-4o
+MODEL = "gpt-4o"
+
+# Temperatura configurável (default 0.6)
+TEMP = float(os.getenv("OPENAI_TEMPERATURE", "0.6"))
 
 SYSTEM_PROMPT = """
 Você é o RevisaAi, um líder experiente que ajuda profissionais a se comunicarem melhor no WhatsApp corporativo brasileiro.
 
-Seu papel é elevar a maturidade da mensagem, proteger a reputação do usuário e tornar a comunicação mais clara e estratégica.
+Seu papel é elevar a qualidade da mensagem, proteger a reputação do usuário e tornar a comunicação mais clara, estratégica e humana.
 
-Princípios:
+Responda sempre de forma:
 
-- Linguagem natural de WhatsApp.
-- Tom maduro, seguro e direto.
-- Sem formalidade excessiva.
-- Sem linguagem de RH.
-- Sem burocracia.
-- Sem frases genéricas.
-- Sem julgamentos desnecessários.
-- Foco em evolução e ajuste, não acusação.
+- Natural (português brasileiro)
+- Direta e objetiva
+- Madura e confiante
+- Sem formalidade burocrática
+- Sem linguagem de RH
+- Sem frases genéricas de IA
+- Sem julgamentos desnecessários
 
-Se a mensagem for crítica:
-→ Redirecione para melhoria futura.
+Se houver crítica, redirecione para foco em evolução futura.
+Se houver cobrança, mantenha autoridade com clareza.
+Se houver pedido interno, torne prioridade explícita.
 
-Se for cobrança:
-→ Mantenha autoridade com clareza.
-
-Se for pedido interno:
-→ Aumente objetividade e prioridade.
-
-Evite estruturas artificiais.
-Prefira frases curtas e naturais.
+Use frases curtas e claras.
 Máximo de 2 frases por versão.
 
 Formato obrigatório:
@@ -70,7 +66,9 @@ def gerar_versoes(texto_original: str) -> str:
     response = client.responses.create(
         model=MODEL,
         instructions=SYSTEM_PROMPT,
-        input=f"Mensagem original:\n{texto_original}\n\nGere as três versões agora."
+        input=f"Mensagem original:\n{texto_original}\n\nGere as versões agora.",
+        temperature=TEMP,
+        max_output_tokens=500
     )
 
     return response.output_text
@@ -93,10 +91,10 @@ async def whatsapp_webhook(request: Request):
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Oi! Eu sou o RevisaAi.\n\n"
-            "Me envie a mensagem que você quer melhorar e eu devolvo 3 versões:\n"
-            "1) Mais educada\n"
-            "2) Mais firme\n"
-            "3) Mais profissional"
+            "Me envie a mensagem que você quer melhorar e eu devolvo:\n"
+            "• Versão recomendada\n"
+            "• Uma alternativa mais direta\n"
+            "• Uma alternativa mais diplomática\n"
         )
         return Response(content=str(twiml), media_type="application/xml")
 
@@ -107,9 +105,8 @@ async def whatsapp_webhook(request: Request):
     except Exception as e:
         print("Erro ao chamar OpenAI:", e)
         twiml.message(
-            "Tive um problema ao revisar sua mensagem agora 😕\n"
+            "Tive um problema ao revisar sua mensagem 😕\n"
             "Pode tentar novamente em alguns segundos?"
         )
 
     return Response(content=str(twiml), media_type="application/xml")
-
