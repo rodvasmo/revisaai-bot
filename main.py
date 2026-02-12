@@ -13,7 +13,7 @@ client = OpenAI()
 MODEL = "gpt-4o"
 
 # Temperatura configurável (default 0.6)
-TEMP = float(os.getenv("OPENAI_TEMPERATURE", "0.6"))
+TEMP = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
 
 SYSTEM_PROMPT = """
 Você é o RevisaAi, um líder experiente que ajuda profissionais a se comunicarem melhor no WhatsApp corporativo brasileiro.
@@ -60,19 +60,28 @@ Outras opções:
 ...
 
 Não explique o processo.
+Sempre que possível, reestruture a mensagem para torná-la mais estratégica, não apenas suavizada.
+
 """
 
 def gerar_versoes(texto_original: str) -> str:
     response = client.responses.create(
         model=MODEL,
-        instructions=SYSTEM_PROMPT,
-        input=f"Mensagem original:\n{texto_original}\n\nGere as versões agora.",
         temperature=TEMP,
-        max_output_tokens=500
+        max_output_tokens=600,
+        input=[
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT
+            },
+            {
+                "role": "user",
+                "content": f"Mensagem original:\n{texto_original}"
+            }
+        ]
     )
 
     return response.output_text
-
 
 @app.get("/health")
 def health():
