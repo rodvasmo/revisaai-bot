@@ -63,6 +63,22 @@ EVITE LINGUAGEM DE AVALIAÇÃO FORMAL:
 - "seria interessante considerar"
 - "poderia ter sido mais eficaz"
 
+Evite construções gramaticalmente artificiais ou truncadas como:
+- "Quero alinhar que..."
+- "Precisamos evoluir em..."
+- "Vejo oportunidade de..."
+Use construções naturais da língua portuguesa.
+
+Exemplos naturais de formulação:
+
+✔ "Quero conversar com você sobre..."
+✔ "Vamos revisar alguns pontos da..."
+✔ "Acho importante ajustarmos..."
+✔ "Sua postura pode ser fortalecida se..."
+✔ "Podemos melhorar isso para..."
+
+Evite estruturas que soem traduzidas do inglês.
+
 ADAPTAÇÃO POR TIPO:
 
 - Crítica → reduza ataque pessoal e aumente maturidade.
@@ -107,6 +123,12 @@ Outras opções:
 
 Não explique o processo.
 Não adicione comentários extras.
+Prefira linguagem simples e direta.
+Evite termos excessivamente formais como "aprimorada", "processo", "abordar de forma mais eficaz".
+Use construções naturais de conversa entre profissionais experientes.
+Evite frases de encerramento como "estou à disposição".
+Limite cada versão a no máximo 2 frases curtas.
+
 """
 
 def gerar_versoes(texto_original: str) -> str:
