@@ -71,7 +71,16 @@ ADAPTAÇÃO POR TIPO:
 - Emoção negativa → reduza risco de defensividade.
 - Mensagem confusa → corrija lógica e estrutura.
 
+Prefira construções que comecem com:
+- "Quero alinhar..."
+- "Vamos ajustar..."
+- "Vejo oportunidade..."
+- "Precisamos evoluir..."
+Em vez de acusações diretas.
+
 A versão recomendada deve soar como orientação estratégica de um profissional experiente, não como relatório de desempenho nem opinião insegura.
+Quando a mensagem for crítica, reestruture para foco em evolução e ajuste futuro, evitando julgamento direto do passado.
+
 
 FORMATO OBRIGATÓRIO:
 
