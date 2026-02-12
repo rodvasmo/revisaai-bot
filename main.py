@@ -68,7 +68,7 @@ def gerar_versoes(texto_original: str) -> str:
     response = client.responses.create(
         model=MODEL,
         temperature=TEMP,
-        max_output_tokens=600,
+        max_output_tokens=800,
         input=[
             {
                 "role": "system",
@@ -76,7 +76,21 @@ def gerar_versoes(texto_original: str) -> str:
             },
             {
                 "role": "user",
-                "content": f"Mensagem original:\n{texto_original}"
+                "content": f"""
+Mensagem original:
+{texto_original}
+
+Passo 1 (interno): Analise profundamente:
+- Qual é a emoção dominante?
+- Qual é o risco reputacional real?
+- O que falta de direcionamento?
+- Como transformar isso em movimento estratégico?
+
+Passo 2 (resposta final ao usuário):
+Gere a resposta seguindo o formato obrigatório.
+Reestruture estrategicamente, não apenas suavize.
+Inclua direcionamento claro quando houver frustração ou repetição.
+"""
             }
         ]
     )
