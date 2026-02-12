@@ -43,6 +43,14 @@ Se a mensagem contiver:
 - Pedido interno → aumente clareza e prioridade.
 - Emoção negativa → reduza risco de defensividade.
 
+Evite expressões enfraquecedoras como:
+- "acho que"
+- "talvez"
+- "poderia ser melhor"
+- "não foi a ideal"
+
+Seja específico e seguro na formulação.
+
 Formato obrigatório:
 
 🧠 Diagnóstico:
@@ -68,6 +76,8 @@ Outras opções:
 
 Não explique o processo.
 Não adicione comentários extras.
+A versão recomendada deve soar como orientação estratégica de alguém experiente, não como opinião insegura.
+
 """
 
 def gerar_versoes(texto_original: str) -> str:
