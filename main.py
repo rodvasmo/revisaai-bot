@@ -10,6 +10,8 @@ client = OpenAI()
 MODEL = "gpt-4o"
 TEMP = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
 
+FOOTER = "\n\nSe quiser, revise a próxima comigo também."
+
 SYSTEM_PROMPT = """
 Você é o RevisaAi, um líder experiente que ajuda profissionais a se comunicarem melhor no WhatsApp corporativo brasileiro.
 
@@ -140,7 +142,7 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
             "B) 'Podemos fechar um encaminhamento claro com status, responsável, próximo passo e prazo?'\n\n"
             "Proibido na Versão recomendada: 'Preciso do status atual, responsável, próximo passo e prazo...' e variações em formato checklist.\n"
             "Tom executivo moderno. Sem 'oi, pessoal/galera/equipe' e sem 'obrigado/agradeço'."
-    )
+        )
 
     user_instruction = f"""
 Mensagem original:
@@ -152,8 +154,6 @@ Contexto adicional:
 Gere a resposta final no formato obrigatório.
 Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, sem inventar fatos.
 """
-
-FOOTER = "\n\nSe quiser , revise a próxima comigo também."
 
     response = client.responses.create(
         model=MODEL,
@@ -185,7 +185,7 @@ async def whatsapp_webhook(request: Request):
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Oi! Eu sou o RevisaAi.\n\n"
-            "Ás vezes um pequeno ajuste muda tudo.\n "
+            "Às vezes um pequeno ajuste muda tudo.\n"
             "Envie sua mensagem. Eu ajusto para deixá-la mais clara e profissional."
         )
         return Response(content=str(twiml), media_type="application/xml")
@@ -208,7 +208,7 @@ async def whatsapp_webhook(request: Request):
             PENDING.pop(from_number, None)
 
             out = gerar_versoes(original, modo=modo)
-            twiml.message(out+FOOTER)
+            twiml.message(out + FOOTER)
             return Response(content=str(twiml), media_type="application/xml")
 
         # Se precisa de contexto, pergunta uma vez
@@ -225,7 +225,7 @@ async def whatsapp_webhook(request: Request):
 
         # Caso normal: gera direto
         out = gerar_versoes(body)
-        twiml.message(out+FOOTER)
+        twiml.message(out + FOOTER)
 
     except Exception as e:
         print("Erro ao chamar OpenAI:", e)
