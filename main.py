@@ -120,28 +120,29 @@ def _needs_context(original: str) -> bool:
 
 def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
     extra = ""
+
     if modo == "prazo_hoje":
         extra = (
             "O usuário quer cobrar com prioridade para resolver hoje (sem inventar horário). "
             "Tom executivo moderno, calmo e objetivo. Máximo 2 frases por versão."
         )
+
     elif modo == "prazo_especifico":
         extra = (
             "O usuário quer cobrar com prazo específico. Use exatamente o prazo informado pelo usuário, sem inventar. "
             "Tom executivo moderno, calmo e objetivo. Máximo 2 frases por versão."
         )
+
     elif modo == "status_proximo_passo":
         extra = (
             "Objetivo: cobrança executiva pedindo status + responsável + próximo passo + prazo, sem inventar fatos. "
             "A Versão recomendada DEVE ter exatamente 2 frases curtas e soar natural (sem checklist). "
-            "Estrutura obrigatória da Versão recomendada:\n"
-            "Frase 1: Contexto neutro com o fato (ex: 'Esse ponto já foi solicitado 3 vezes e ainda não avançou.').\n"
-            "Frase 2: Pedido em formato de ENCAMINHAMENTO CLARO (uma única frase), evitando lista com vírgulas.\n\n"
-            "Use uma destas duas frases prontas (escolha uma e adapte minimamente):\n"
+            "Estrutura obrigatória:\n"
+            "Frase 1: Contexto neutro com o fato.\n"
+            "Frase 2: Pedido em formato de ENCAMINHAMENTO CLARO.\n"
+            "Use uma destas frases como base:\n"
             "A) 'Você consegue me passar um encaminhamento claro — status, responsável, próximo passo e prazo?'\n"
-            "B) 'Podemos fechar um encaminhamento claro com status, responsável, próximo passo e prazo?'\n\n"
-            "Proibido na Versão recomendada: 'Preciso do status atual, responsável, próximo passo e prazo...' e variações em formato checklist.\n"
-            "Tom executivo moderno. Sem 'oi, pessoal/galera/equipe' e sem 'obrigado/agradeço'."
+            "B) 'Podemos fechar um encaminhamento claro com status, responsável, próximo passo e prazo?'\n"
         )
 
     user_instruction = f"""
@@ -152,7 +153,7 @@ Contexto adicional:
 {extra}
 
 Gere a resposta final no formato obrigatório.
-Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, sem inventar fatos.
+Reestruture estrategicamente sem inventar fatos.
 """
 
     response = client.responses.create(
@@ -164,6 +165,7 @@ Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, 
             {"role": "user", "content": user_instruction},
         ],
     )
+
     return response.output_text
 
 
