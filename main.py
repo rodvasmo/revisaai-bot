@@ -185,7 +185,7 @@ async def whatsapp_webhook(request: Request):
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Oi! Eu sou o RevisaAi.\n\n"
-            "Ás vezes um pequeno ajuste muda tudo. "
+            "Ás vezes um pequeno ajuste muda tudo.\n "
             "Envie sua mensagem. Eu ajusto para deixá-la mais clara e profissional."
         )
         return Response(content=str(twiml), media_type="application/xml")
