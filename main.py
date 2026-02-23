@@ -21,6 +21,18 @@ Regras:
 - Linguagem natural de WhatsApp, tom maduro, direto e humano.
 - Sem formalidade de e-mail, sem RH, sem burocracia, sem frases genéricas.
 
+VOZ (MUITO IMPORTANTE):
+- Tom: executivo moderno, calmo e objetivo.
+- Não use saudações coletivas ou informais: "oi, pessoal", "galera", "equipe".
+- Não use justificativas ou apaziguamento: "entendo que todos estão ocupados".
+- Não use agradecimentos automáticos: "obrigado", "agradeço".
+- Evite exclamações.
+- Não seja longo: no máximo 2 frases por versão (recomendado: 1–2 linhas).
+
+PADRÃO PARA "PEDIR STATUS + PRÓXIMO PASSO":
+- Sempre peça: status + responsável + próximo passo + prazo (sem inventar).
+- Prefira uma pergunta única bem estruturada, ou 2 frases curtas.
+
 Quando houver frustração/cobrança repetida, transforme em direcionamento claro.
 Se faltar contexto (prazo, pedido, próximo passo), peça UMA informação objetiva antes de gerar as versões.
 
@@ -49,31 +61,63 @@ Outras opções:
 Não explique o processo.
 """
 
-# Memória simples por remetente (MVP)
+# Memória simples por remetente (MVP) — some se o serviço reiniciar
 PENDING = {}  # {from_number: {"original": "..."}}
+
 
 def _is_context_choice(text: str) -> bool:
     t = text.strip().lower()
     return t in {"a", "b", "c"}
 
+
 def _needs_context(original: str) -> bool:
     t = original.lower()
-    has_deadline = any(x in t for x in ["hoje", "amanhã", "até", "prazo", "agora", "final do dia", "eod", "fim do dia"])
-    has_action = any(x in t for x in ["resolver", "enviar", "retornar", "pagar", "ajustar", "corrigir", "finalizar", "entregar", "me atualizar", "me atualize", "status"])
-    # sinais de frustração / repetição
-    has_repeat = any(x in t for x in ["três vezes", "3 vezes", "de novo", "novamente", "já pedi", "já foi pedido", "ainda não", "não foi resolvido", "não resolveu"])
-    # se é cobrança repetida/frustrada e não tem prazo/ação clara, vale perguntar
+    has_deadline = any(
+        x in t for x in ["hoje", "amanhã", "até", "prazo", "agora", "final do dia", "fim do dia", "eod"]
+    )
+    has_action = any(
+        x in t
+        for x in [
+            "resolver",
+            "enviar",
+            "retornar",
+            "pagar",
+            "ajustar",
+            "corrigir",
+            "finalizar",
+            "entregar",
+            "atualizar",
+            "status",
+            "posicao",
+            "posição",
+        ]
+    )
+    has_repeat = any(
+        x in t for x in ["três vezes", "3 vezes", "de novo", "novamente", "já pedi", "já foi pedido", "ainda não", "não foi resolvido"]
+    )
     return has_repeat and (not has_deadline or not has_action)
 
+
 def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
-    # modo pode ser: "prazo_hoje", "prazo_especifico", "status_proximo_passo"
     extra = ""
     if modo == "prazo_hoje":
-        extra = "O usuário quer cobrar com prioridade para resolver hoje (sem inventar horário)."
+        extra = (
+            "O usuário quer cobrar com prioridade para resolver hoje (sem inventar horário). "
+            "Tom executivo moderno, calmo e objetivo. Máximo 2 frases por versão."
+        )
     elif modo == "prazo_especifico":
-        extra = "O usuário quer cobrar com prazo específico (usar exatamente o prazo informado pelo usuário, sem inventar)."
+        extra = (
+            "O usuário quer cobrar com prazo específico. Use exatamente o prazo informado pelo usuário, sem inventar. "
+            "Tom executivo moderno, calmo e objetivo. Máximo 2 frases por versão."
+        )
     elif modo == "status_proximo_passo":
-        extra = "O usuário quer uma cobrança diplomática pedindo status e próximo passo (dono + prazo), sem inventar fatos."
+        extra = (
+            "O usuário quer uma cobrança pedindo status + responsável + próximo passo + prazo (sem inventar). "
+            "Escreva em tom executivo moderno. "
+            "NÃO use 'oi, pessoal', 'galera', 'equipe', nem 'obrigado/agradeço'. "
+            "Evite apaziguamento ('entendo que todos estão ocupados'). "
+            "Máximo 2 frases curtas por versão."
+        )
 
     user_instruction = f"""
 Mensagem original:
@@ -97,9 +141,11 @@ Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, 
     )
     return response.output_text
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/whatsapp")
 async def whatsapp_webhook(request: Request):
@@ -110,6 +156,7 @@ async def whatsapp_webhook(request: Request):
 
     twiml = MessagingResponse()
 
+    # Mensagem inicial
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Oi! Eu sou o RevisaAi.\n\n"
@@ -135,7 +182,6 @@ async def whatsapp_webhook(request: Request):
             # limpa estado
             PENDING.pop(from_number, None)
 
-            # gera versões com o modo escolhido
             out = gerar_versoes(original, modo=modo)
             twiml.message(out)
             return Response(content=str(twiml), media_type="application/xml")
