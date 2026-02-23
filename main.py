@@ -131,11 +131,12 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
     elif modo == "status_proximo_passo":
         extra = (
             "O usuário quer uma cobrança pedindo status + responsável + próximo passo + prazo (sem inventar). "
-            "A Versão recomendada DEVE conter 2 frases: "
-            "(1) uma frase curta com o contexto neutro da mensagem original (ex.: 'já foi solicitado 3 vezes e ainda não avançou'), "
-            "(2) uma pergunta objetiva pedindo status, responsável e próximo passo com prazo. "
+            "A Versão recomendada DEVE ter 2 frases curtas: "
+            "(1) uma frase com o contexto neutro (ex.: 'já foi solicitado 3 vezes e ainda não avançou'); "
+            "(2) uma frase pedindo um ENCAMINHAMENTO CLARO (status + responsável + próximo passo + prazo) em uma única frase, "
+            "sem perguntas telegráficas como 'Qual o status atual?'. "
             "Tom executivo moderno. Sem 'oi, pessoal/galera/equipe' e sem 'obrigado/agradeço'."
-        )
+    )
 
     user_instruction = f"""
 Mensagem original:
