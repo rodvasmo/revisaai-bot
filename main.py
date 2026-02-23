@@ -33,6 +33,11 @@ PADRÃO PARA "PEDIR STATUS + PRÓXIMO PASSO":
 - Sempre peça: status + responsável + próximo passo + prazo (sem inventar).
 - Prefira uma pergunta única bem estruturada, ou 2 frases curtas.
 
+REGRA DE OURO (NÃO IGNORAR O CONTEXTO):
+- Se a mensagem original trouxer fatos concretos (ex: "3 vezes", "ainda não foi resolvido", "NF", valores, datas), a Versão recomendada DEVE incluir esse fato de forma neutra em 1 frase curta.
+- A Versão recomendada deve seguir este padrão:
+  (1) Contexto neutro com o fato + (2) Pedido de encaminhamento (status + responsável + próximo passo + prazo).
+
 Quando houver frustração/cobrança repetida, transforme em direcionamento claro.
 Se faltar contexto (prazo, pedido, próximo passo), peça UMA informação objetiva antes de gerar as versões.
 
@@ -72,6 +77,7 @@ def _is_context_choice(text: str) -> bool:
 
 def _needs_context(original: str) -> bool:
     t = original.lower()
+
     has_deadline = any(
         x in t for x in ["hoje", "amanhã", "até", "prazo", "agora", "final do dia", "fim do dia", "eod"]
     )
@@ -88,13 +94,25 @@ def _needs_context(original: str) -> bool:
             "entregar",
             "atualizar",
             "status",
-            "posicao",
             "posição",
+            "posicao",
         ]
     )
     has_repeat = any(
-        x in t for x in ["três vezes", "3 vezes", "de novo", "novamente", "já pedi", "já foi pedido", "ainda não", "não foi resolvido"]
+        x in t
+        for x in [
+            "três vezes",
+            "3 vezes",
+            "de novo",
+            "novamente",
+            "já pedi",
+            "já foi pedido",
+            "ainda não",
+            "não foi resolvido",
+        ]
     )
+
+    # Se há repetição/frustração e falta deadline ou ação clara, vale perguntar uma vez
     return has_repeat and (not has_deadline or not has_action)
 
 
@@ -113,10 +131,10 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
     elif modo == "status_proximo_passo":
         extra = (
             "O usuário quer uma cobrança pedindo status + responsável + próximo passo + prazo (sem inventar). "
-            "Escreva em tom executivo moderno. "
-            "NÃO use 'oi, pessoal', 'galera', 'equipe', nem 'obrigado/agradeço'. "
-            "Evite apaziguamento ('entendo que todos estão ocupados'). "
-            "Máximo 2 frases curtas por versão."
+            "A Versão recomendada DEVE conter 2 frases: "
+            "(1) uma frase curta com o contexto neutro da mensagem original (ex.: 'já foi solicitado 3 vezes e ainda não avançou'), "
+            "(2) uma pergunta objetiva pedindo status, responsável e próximo passo com prazo. "
+            "Tom executivo moderno. Sem 'oi, pessoal/galera/equipe' e sem 'obrigado/agradeço'."
         )
 
     user_instruction = f"""
@@ -179,7 +197,7 @@ async def whatsapp_webhook(request: Request):
             elif choice == "c":
                 modo = "status_proximo_passo"
 
-            # limpa estado
+            # Limpa estado
             PENDING.pop(from_number, None)
 
             out = gerar_versoes(original, modo=modo)
