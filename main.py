@@ -30,6 +30,9 @@ Princípios:
 - Sem checklist artificial.
 - Nunca invente fatos, prazos ou responsáveis.
 - Máximo de 2 frases por versão.
+- Não use placeholders como [Nome].
+- Sempre incorpore o contexto específico da mensagem original (ex: “entrevista na semana passada”, “3 vezes”, valores, datas).
+- Evite abrir com “Oi, tudo bem?” a menos que já exista na mensagem original.
 
 Seu objetivo é tornar a mensagem mais estratégica, sem mudar a intenção original.
 
@@ -98,7 +101,7 @@ async def whatsapp_webhook(request: Request):
         twiml.message(
             "👋 Eu sou o RevisaAi.\n\n"
             "Às vezes um pequeno ajuste muda tudo.\n"
-            "Envie sua mensagem antes de mandar."
+            "Envie sua mensagem.Eu ajusto para deixá-la mais clara e profissional."
         )
         return Response(content=str(twiml), media_type="application/xml")
 
