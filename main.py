@@ -130,11 +130,15 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
         )
     elif modo == "status_proximo_passo":
         extra = (
-            "O usuário quer uma cobrança pedindo status + responsável + próximo passo + prazo (sem inventar). "
-            "A Versão recomendada DEVE ter 2 frases curtas: "
-            "(1) uma frase com o contexto neutro (ex.: 'já foi solicitado 3 vezes e ainda não avançou'); "
-            "(2) uma frase pedindo um ENCAMINHAMENTO CLARO (status + responsável + próximo passo + prazo) em uma única frase, "
-            "sem perguntas telegráficas como 'Qual o status atual?'. "
+            "Objetivo: cobrança executiva pedindo status + responsável + próximo passo + prazo, sem inventar fatos. "
+            "A Versão recomendada DEVE ter exatamente 2 frases curtas e soar natural (sem checklist). "
+            "Estrutura obrigatória da Versão recomendada:\n"
+            "Frase 1: Contexto neutro com o fato (ex: 'Esse ponto já foi solicitado 3 vezes e ainda não avançou.').\n"
+            "Frase 2: Pedido em formato de ENCAMINHAMENTO CLARO (uma única frase), evitando lista com vírgulas.\n\n"
+            "Use uma destas duas frases prontas (escolha uma e adapte minimamente):\n"
+            "A) 'Você consegue me passar um encaminhamento claro — status, responsável, próximo passo e prazo?'\n"
+            "B) 'Podemos fechar um encaminhamento claro com status, responsável, próximo passo e prazo?'\n\n"
+            "Proibido na Versão recomendada: 'Preciso do status atual, responsável, próximo passo e prazo...' e variações em formato checklist.\n"
             "Tom executivo moderno. Sem 'oi, pessoal/galera/equipe' e sem 'obrigado/agradeço'."
     )
 
