@@ -153,6 +153,8 @@ Gere a resposta final no formato obrigatório.
 Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, sem inventar fatos.
 """
 
+FOOTER = "\n\nSe quiser , revise a próxima comigo também."
+
     response = client.responses.create(
         model=MODEL,
         temperature=TEMP,
@@ -206,7 +208,7 @@ async def whatsapp_webhook(request: Request):
             PENDING.pop(from_number, None)
 
             out = gerar_versoes(original, modo=modo)
-            twiml.message(out)
+            twiml.message(out+FOOTER)
             return Response(content=str(twiml), media_type="application/xml")
 
         # Se precisa de contexto, pergunta uma vez
@@ -223,7 +225,7 @@ async def whatsapp_webhook(request: Request):
 
         # Caso normal: gera direto
         out = gerar_versoes(body)
-        twiml.message(out)
+        twiml.message(out+FOOTER)
 
     except Exception as e:
         print("Erro ao chamar OpenAI:", e)
