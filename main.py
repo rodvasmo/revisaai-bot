@@ -1,4 +1,5 @@
 import os
+import json
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from twilio.twiml.messaging_response import MessagingResponse
@@ -36,7 +37,8 @@ PADRÃO PARA "PEDIR STATUS + PRÓXIMO PASSO":
 - Prefira uma pergunta única bem estruturada, ou 2 frases curtas.
 
 REGRA DE OURO (NÃO IGNORAR O CONTEXTO):
-- Se a mensagem original trouxer fatos concretos (ex: "3 vezes", "ainda não foi resolvido", "NF", valores, datas), a Versão recomendada DEVE incluir esse fato de forma neutra em 1 frase curta.
+- Se a mensagem original trouxer fatos concretos (ex: "3 vezes", "ainda não foi resolvido", "NF", valores, datas),
+  a Versão recomendada DEVE incluir esse fato de forma neutra em 1 frase curta.
 - A Versão recomendada deve seguir este padrão:
   (1) Contexto neutro com o fato + (2) Pedido de encaminhamento (status + responsável + próximo passo + prazo).
 
@@ -68,6 +70,28 @@ Outras opções:
 Não explique o processo.
 """
 
+ROUTER_PROMPT = """
+Você é um classificador. Retorne APENAS JSON válido, sem texto extra.
+
+Escolha mode em:
+- "default"
+- "ask_context"
+- "status_proximo_passo"
+- "prazo_hoje"
+- "prazo_especifico"
+
+Regras:
+- Use "status_proximo_passo" para cobranças/follow-ups com repetição/frustração onde o usuário pede update/status/retorno.
+- Use "ask_context" quando for cobrança/repetição e estiver ambíguo se a pessoa quer (A) resolver hoje, (B) prazo específico, (C) pedir status + próximo passo.
+- Use "prazo_hoje" quando a mensagem explicitamente pedir resolver hoje/final do dia.
+- Use "prazo_especifico" quando a mensagem tiver um prazo explícito (data/horário/até X).
+- Caso contrário, "default".
+
+Responda somente com JSON no formato:
+{"mode":"default"}
+"""
+
+
 # Memória simples por remetente (MVP) — some se o serviço reiniciar
 PENDING = {}  # {from_number: {"original": "..."}}
 
@@ -77,45 +101,31 @@ def _is_context_choice(text: str) -> bool:
     return t in {"a", "b", "c"}
 
 
-def _needs_context(original: str) -> bool:
-    t = original.lower()
-
-    has_deadline = any(
-        x in t for x in ["hoje", "amanhã", "até", "prazo", "agora", "final do dia", "fim do dia", "eod"]
-    )
-    has_action = any(
-        x in t
-        for x in [
-            "resolver",
-            "enviar",
-            "retornar",
-            "pagar",
-            "ajustar",
-            "corrigir",
-            "finalizar",
-            "entregar",
-            "atualizar",
-            "status",
-            "posição",
-            "posicao",
-        ]
-    )
-    has_repeat = any(
-        x in t
-        for x in [
-            "três vezes",
-            "3 vezes",
-            "de novo",
-            "novamente",
-            "já pedi",
-            "já foi pedido",
-            "ainda não",
-            "não foi resolvido",
-        ]
-    )
-
-    # Se há repetição/frustração e falta deadline ou ação clara, vale perguntar uma vez
-    return has_repeat and (not has_deadline or not has_action)
+def route_message(texto: str) -> str:
+    """
+    Roteador conservador: escolhe um modo SEM alterar o writer.
+    Se falhar, cai em default.
+    """
+    try:
+        r = client.responses.create(
+            model=MODEL,
+            temperature=0.0,
+            max_output_tokens=80,
+            input=[
+                {"role": "system", "content": ROUTER_PROMPT},
+                {"role": "user", "content": texto},
+            ],
+        )
+        raw = (r.output_text or "").strip()
+        start, end = raw.find("{"), raw.rfind("}")
+        if start == -1 or end == -1:
+            return "default"
+        obj = json.loads(raw[start : end + 1])
+        mode = obj.get("mode", "default")
+        allowed = {"default", "ask_context", "status_proximo_passo", "prazo_hoje", "prazo_especifico"}
+        return mode if mode in allowed else "default"
+    except Exception:
+        return "default"
 
 
 def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
@@ -129,7 +139,8 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
 
     elif modo == "prazo_especifico":
         extra = (
-            "O usuário quer cobrar com prazo específico. Use exatamente o prazo informado pelo usuário, sem inventar. "
+            "O usuário quer cobrar com prazo específico (já presente na mensagem). "
+            "Use exatamente o prazo informado pelo usuário, sem inventar. "
             "Tom executivo moderno, calmo e objetivo. Máximo 2 frases por versão."
         )
 
@@ -137,10 +148,10 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
         extra = (
             "Objetivo: cobrança executiva pedindo status + responsável + próximo passo + prazo, sem inventar fatos. "
             "A Versão recomendada DEVE ter exatamente 2 frases curtas e soar natural (sem checklist). "
-            "Estrutura obrigatória:\n"
-            "Frase 1: Contexto neutro com o fato.\n"
-            "Frase 2: Pedido em formato de ENCAMINHAMENTO CLARO.\n"
-            "Use uma destas frases como base:\n"
+            "Estrutura obrigatória da Versão recomendada:\n"
+            "Frase 1: Contexto neutro com o fato (ex: 'Esse ponto já foi solicitado 3 vezes e ainda não avançou.').\n"
+            "Frase 2: Pedido em formato de ENCAMINHAMENTO CLARO (uma única frase), evitando checklist.\n\n"
+            "Use uma destas frases como base (adapte minimamente):\n"
             "A) 'Você consegue me passar um encaminhamento claro — status, responsável, próximo passo e prazo?'\n"
             "B) 'Podemos fechar um encaminhamento claro com status, responsável, próximo passo e prazo?'\n"
         )
@@ -149,11 +160,11 @@ def gerar_versoes(texto_original: str, modo: str | None = None) -> str:
 Mensagem original:
 {texto_original}
 
-Contexto adicional:
+Contexto adicional (se houver):
 {extra}
 
 Gere a resposta final no formato obrigatório.
-Reestruture estrategicamente sem inventar fatos.
+Reestruture estrategicamente e proponha encaminhamento claro quando aplicável, sem inventar fatos.
 """
 
     response = client.responses.create(
@@ -193,7 +204,7 @@ async def whatsapp_webhook(request: Request):
         return Response(content=str(twiml), media_type="application/xml")
 
     try:
-        # Se estamos esperando escolha A/B/C
+        # Se estamos esperando escolha A/B/C (fluxo existente)
         if from_number in PENDING and _is_context_choice(body):
             original = PENDING[from_number]["original"]
             choice = body.strip().lower()
@@ -206,15 +217,16 @@ async def whatsapp_webhook(request: Request):
             elif choice == "c":
                 modo = "status_proximo_passo"
 
-            # Limpa estado
             PENDING.pop(from_number, None)
 
             out = gerar_versoes(original, modo=modo)
             twiml.message(out + FOOTER)
             return Response(content=str(twiml), media_type="application/xml")
 
-        # Se precisa de contexto, pergunta uma vez
-        if _needs_context(body):
+        # Router conservador (não altera writer)
+        mode = route_message(body)
+
+        if mode == "ask_context":
             PENDING[from_number] = {"original": body}
             twiml.message(
                 "Rápido: você quer cobrar como?\n"
@@ -225,8 +237,11 @@ async def whatsapp_webhook(request: Request):
             )
             return Response(content=str(twiml), media_type="application/xml")
 
-        # Caso normal: gera direto
-        out = gerar_versoes(body)
+        if mode in {"status_proximo_passo", "prazo_hoje", "prazo_especifico"}:
+            out = gerar_versoes(body, modo=mode)
+        else:
+            out = gerar_versoes(body)
+
         twiml.message(out + FOOTER)
 
     except Exception as e:
