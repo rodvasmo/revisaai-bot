@@ -66,8 +66,15 @@ Tratamento por intenção:
 - Nunca manter a formulação emocional original.
 
 2) Cobrança com repetição:
-- Frase 1: Contexto neutro com o fato preservado.
-- Frase 2: Pedido de encaminhamento claro (status, responsável, próximo passo e prazo) em formulação natural, sem checklist mecânico.
+- Frase 1: Contextualize o fato de forma neutra, preservando a repetição ou ausência de avanço.
+- Frase 2: Transforme a frustração em direcionamento estratégico para evolução futura.
+- Evite perguntas genéricas como “como podemos resolver?” ou “poderia me informar?”.
+- Prefira formulações executivas que indiquem ajuste e encaminhamento, como:
+  “vamos alinhar um encaminhamento claro”
+  “vale ajustarmos isso daqui em diante”
+  “precisamos definir como isso evolui”
+  “vamos estabelecer como isso será conduzido”
+- A segunda frase deve soar firme, madura e orientada a ação — não burocrática e não emocional.
 
 3) Follow-up externo (entrevista, contrato, proposta etc.):
 - Preserve fatos e tempo.
