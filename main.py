@@ -115,7 +115,6 @@ Outras opções:
 Não explique o processo.
 """
 
-# Micro-frameworks (invisíveis) para consistência
 MODE_GUIDES = {
     "critica_comportamental": """
 A mensagem é uma crítica sobre postura/comportamento.
@@ -164,10 +163,8 @@ Objetivo:
 
 
 def classify_mode(texto: str) -> str:
-    """Classificador leve (heurística). Mantém consistência sem virar um monstro de ifs."""
     t = (texto or "").strip().lower()
 
-    # Crítica comportamental (postura, atitude, comportamento em reunião, etc.)
     critica_markers = [
         "não gostei",
         "nao gostei",
@@ -185,7 +182,6 @@ def classify_mode(texto: str) -> str:
     if any(m in t for m in critica_markers):
         return "critica_comportamental"
 
-    # Cobrança repetida
     repeticao_markers = [
         "3 vezes",
         "três vezes",
@@ -222,7 +218,6 @@ def classify_mode(texto: str) -> str:
     if any(m in t for m in repeticao_markers) and any(v in t for v in cobranca_verbs):
         return "cobranca_repetida"
 
-    # Follow-up externo (entrevista, contrato, proposta, e-mail)
     followup_markers = [
         "entrevista",
         "processo seletivo",
@@ -244,7 +239,6 @@ def classify_mode(texto: str) -> str:
     if any(m in t for m in followup_markers) and (any(x in t for x in temporal_markers) or "retorno" in t):
         return "followup_externo"
 
-    # Pedido interno
     pedido_markers = [
         "poderia me ajudar",
         "consegue me ajudar",
@@ -292,7 +286,6 @@ Gere a resposta final no formato obrigatório.
         ],
     )
 
-    # Normalmente output_text funciona bem
     return (getattr(resp, "output_text", "") or "").strip() or "Não consegui gerar a resposta agora. Pode tentar novamente?"
 
 
@@ -309,14 +302,11 @@ async def whatsapp_webhook(request: Request):
 
     twiml = MessagingResponse()
 
-    # Onboarding simples
+    # Onboarding simples (modo diagnóstico: resposta mínima)
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
-        twiml.message(
-            "👋 Eu sou o RevisaAi.\n\n"
-            "As vezes um pequeno ajuste muda tudo.\n"
-            "Envie sua mensagem e eu devolvo uma versão mais clara e profissional."
-        )
-        return Response(content=str(twiml), media_type="application/xml")
+        twiml.message("Teste RevisaAi")
+        print("TwiML:", str(twiml))
+        return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
     try:
         mode = classify_mode(body)
@@ -327,4 +317,5 @@ async def whatsapp_webhook(request: Request):
         print("Erro ao chamar OpenAI:", e)
         twiml.message("Tive um problema ao revisar sua mensagem 😕 Pode tentar novamente em alguns segundos?")
 
-    return Response(content=str(twiml), media_type="application/xml")
+    print("TwiML:", str(twiml))
+    return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
