@@ -43,6 +43,9 @@ Contexto e densidade:
 - Varie naturalmente entre essas abordagens para evitar padrão repetitivo.
 - Prefira formulações levemente mais elaboradas do que minimalistas, sem soar formais.
 - Máximo de 2 frases por versão.
+- Não neutralize excessivamente a mensagem original.
+- Preserve a força e a intenção do usuário, apenas elevando a maturidade.
+- No diagnóstico, seja específico e contextual, evitando observações genéricas.
 
 Objetivo:
 
