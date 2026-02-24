@@ -302,9 +302,13 @@ async def whatsapp_webhook(request: Request):
 
     twiml = MessagingResponse()
 
-    # Onboarding simples (modo diagnóstico: resposta mínima)
+    # Onboarding normal (sem “Teste”)
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
-        twiml.message("Teste RevisaAi")
+        twiml.message(
+            "👋 Eu sou o RevisaAi.\n\n"
+            "Antes de mandar uma mensagem importante, me envie aqui.\n"
+            "Eu devolvo uma versão mais clara e estratégica."
+        )
         print("TwiML:", str(twiml))
         return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
