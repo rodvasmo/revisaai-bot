@@ -82,7 +82,9 @@ Tratamento por intenção:
 
 Objetivo final:
 
-A versão recomendada deve soar madura, estratégica e equilibrada.
+A Versão recomendada deve ser a mais estratégica e equilibrada das três.
+Ela não deve ser a mais neutra nem a mais conservadora.
+Ela deve soar como a melhor escolha executiva.
 Nunca seca.
 Nunca burocrática.
 Nunca excessivamente cordial.
