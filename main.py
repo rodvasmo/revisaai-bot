@@ -48,10 +48,12 @@ Regras críticas:
   Prefira “Você consegue…”, “Você pode…”, ou formulações naturais equivalentes.
 - Não use termos acusatórios/infantilizantes: “prometeu”, “cobrador”.
 
-REGRA NOVA (FIRMEZA COM CONSEQUÊNCIA):
-- Se a mensagem original tiver uma condição + consequência (ex: “Se isso continuar…, vamos ter que…”),
-  preserve a lógica condicional e a consequência, apenas reduzindo o tom ameaçador.
-- Não “neutralize” removendo a condição. Mantenha firmeza madura.
+REGRA (FIRMEZA COM CONSEQUÊNCIA):
+- Se a mensagem original tiver condição + consequência (ex: “Se isso continuar…, vamos ter que…”),
+  preserve a estrutura condicional e a consequência.
+- Reduza apenas o tom ameaçador; NÃO dilua para linguagem genérica.
+  Proibido na Versão recomendada: “para garantir que tudo funcione bem”, “reavaliar como estamos distribuindo”.
+  Prefira formulações executivas: “precisaremos rever responsabilidades”, “para assegurar execução/entrega”.
 
 Hierarquia:
 - A Versão recomendada deve ser a mais equilibrada e madura (puxada para o lado diplomático), sem soar passiva.
@@ -112,6 +114,21 @@ Regras:
 - Preserve fatos do texto original (atraso, repetição, reunião, decisões voltando).
 - Não invente prazo, responsável, número, ou “próxima etapa” específica.
 - Não use lista longa; se usar bullets, no máximo 3 e bem curtos.
+""",
+    "consequencia": """
+Intenção detectada: CONDIÇÃO + CONSEQUÊNCIA (pressão executiva sem ameaça).
+
+Diretrizes:
+- Preserve a lógica: “Se X continuar/persistir, teremos/precisaremos Y”.
+- Mantenha firmeza madura; evite suavizar demais.
+- NÃO transforme em frase genérica/“consultoria”:
+  proibido: “reavaliar como estamos distribuindo”, “para garantir que tudo funcione bem”, “melhorar nossa eficiência”.
+- A Versão recomendada deve soar como liderança: consequência clara + racional (execução/entrega).
+- 1–2 frases.
+
+Exemplos de padrão aceitável (adapte ao texto):
+- “Se isso persistir, precisaremos rever responsabilidades para assegurar execução consistente.”
+- “Se esse padrão continuar, vamos revisar responsabilidades para garantir entrega no nível esperado.”
 """,
     "critica": """
 Intenção detectada: CRÍTICA / FEEDBACK sobre postura/atitude/abordagem.
@@ -174,9 +191,8 @@ Diretrizes:
 
 INTENT_LABELS = set(TYPE_GUIDES.keys())
 
-
 # =========================
-# 2.5) GATILHO PARA TEXTO LONGO (determinístico)
+# 2.5) GATILHOS DETERMINÍSTICOS
 # =========================
 def _is_long_text(texto: str) -> bool:
     t = (texto or "").strip()
@@ -185,14 +201,36 @@ def _is_long_text(texto: str) -> bool:
     has_multi_sentences = len(re.findall(r"[.!?]", t)) >= 3
     return (words >= 90) or (paragraphs >= 2 and words >= 60) or (has_multi_sentences and words >= 80)
 
+def _is_conditional_consequence(texto: str) -> bool:
+    """
+    Detecta padrão de condição + consequência sem depender do classificador LLM.
+    Ex: "Se isso continuar..., vamos ter que..." / "Se isso persistir, precisaremos..."
+    """
+    t = (texto or "").strip().lower()
+
+    has_if = re.search(r"\bse\b", t) is not None
+    has_continue = any(x in t for x in ["continuar", "persistir", "seguir", "mantiver", "se mantiver", "ficar assim", "desse jeito"])
+    has_consequence = any(x in t for x in ["vamos ter que", "teremos que", "precisaremos", "vamos precisar", "vai ser preciso", "será preciso"])
+    has_responsibility = any(x in t for x in ["responsabilidad", "ownership", "quem faz o quê", "quem faz o que", "papéis", "papeis", "escopo", "alçadas", "alcadas"])
+
+    # Caso clássico que você testou (sem "responsabilidades" explícito)
+    classic = has_if and has_continue and has_consequence
+
+    # Caso com responsabilidade explícita
+    with_resp = has_if and has_consequence and has_responsibility
+
+    return classic or with_resp
 
 # =========================
 # 3) CLASSIFICAÇÃO SEMÂNTICA (LLM)
 # =========================
 def classificar_intencao(texto: str) -> str:
-    # Se for texto longo, força memorando sem depender do classificador
+    # Ordem importa: primeiro os gatilhos determinísticos
     if _is_long_text(texto):
         return "memorando_estrategico"
+
+    if _is_conditional_consequence(texto):
+        return "consequencia"
 
     prompt = f"""
 Classifique a intenção principal da mensagem abaixo em APENAS UMA destas opções:
@@ -231,7 +269,6 @@ Mensagem:
         print("Erro ao classificar intenção:", e)
         return "neutro"
 
-
 # =========================
 # 4) GERAÇÃO (LLM)
 # =========================
@@ -261,11 +298,9 @@ Agora gere a resposta final no FORMATO OBRIGATÓRIO.
     out = (getattr(r, "output_text", "") or "").strip()
     return out or "Não consegui gerar a resposta agora. Pode tentar novamente?"
 
-
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
 
 @app.post("/whatsapp")
 async def whatsapp_webhook(request: Request):
