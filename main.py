@@ -10,7 +10,10 @@ client = OpenAI()
 
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 TEMP = float(os.getenv("OPENAI_TEMPERATURE", "0.6"))
-MAX_TOKENS = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "650"))
+
+# Mantém seu default, mas vamos ajustar dinamicamente para memorando
+MAX_TOKENS_DEFAULT = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "650"))
+MAX_TOKENS_MEMO = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS_MEMO", "1100"))
 
 FOOTER = "\n\nSe quiser, revise a próxima comigo também."
 
@@ -33,7 +36,7 @@ Estilo:
 - Sem linguagem de RH, sem consultoria, sem burocracia.
 - Sem frases genéricas de IA.
 - Sem checklist artificial.
-- Máximo de 2 frases por versão.
+- Máximo de 2 frases por versão (EXCETO em memorando_estrategico).
 - Não use placeholders como [Nome].
 - Evite “Oi, tudo bem?” a menos que exista no original.
 
@@ -78,6 +81,18 @@ Não explique o processo.
 # 2) MINI-PROMPTS POR TIPO
 # =========================
 TYPE_GUIDES = {
+    "memorando_estrategico": """
+Intenção detectada: MEMORANDO ESTRATÉGICO / COMUNICAÇÃO DE LIDERANÇA (texto longo).
+
+Diretrizes:
+- Reestruture o texto com lógica e fluidez, sem apenas “limpar” frases.
+- Transforme frustração em direcionamento claro, sem dramatização.
+- Preserve fatos concretos (atraso, repetição, reunião, etc).
+- Remova acusações pessoais/generalizações (“ninguém”, “sempre”, “constrangedor”) ou reformule de forma madura.
+- Organize em 2–3 blocos curtos (parágrafos) se fizer sentido.
+- Aqui você PODE ultrapassar 2 frases por versão, mas mantenha concisão.
+- A Versão recomendada deve soar como um memo executivo: firme, calmo, e orientado a execução.
+""",
     "critica": """
 Intenção detectada: CRÍTICA / FEEDBACK sobre postura/atitude/abordagem.
 
@@ -137,15 +152,21 @@ Diretrizes:
 """,
 }
 
-INTENT_LABELS = {
-    "critica",
-    "cobranca_repetida",
-    "cobranca_firme",
-    "followup_externo",
-    "pedido_interno",
-    "neutro",
-}
+INTENT_LABELS = set(TYPE_GUIDES.keys())
 
+# =========================
+# 2.5) GATILHO PARA TEXTO LONGO
+# =========================
+def _is_long_text(texto: str) -> bool:
+    """
+    Gatilho simples e determinístico para ativar memorando.
+    Ajuste os thresholds sem medo (não afeta frases curtas).
+    """
+    t = (texto or "").strip()
+    words = len(t.split())
+    paragraphs = len([p for p in re.split(r"\n\s*\n", t) if p.strip()])
+    has_multi_sentences = len(re.findall(r"[.!?]", t)) >= 3
+    return (words >= 90) or (paragraphs >= 2 and words >= 60) or (has_multi_sentences and words >= 80)
 
 # =========================
 # 3) CLASSIFICAÇÃO SEMÂNTICA (LLM)
@@ -154,8 +175,11 @@ def classificar_intencao(texto: str) -> str:
     """
     Chamada 1: classifica intenção semanticamente.
     Retorna 1 label dentre:
-    critica, cobranca_repetida, cobranca_firme, followup_externo, pedido_interno, neutro
+    memorando_estrategico, critica, cobranca_repetida, cobranca_firme, followup_externo, pedido_interno, neutro
     """
+    if _is_long_text(texto):
+        return "memorando_estrategico"
+
     prompt = f"""
 Classifique a intenção principal da mensagem abaixo em APENAS UMA destas opções:
 - critica
@@ -193,7 +217,6 @@ Mensagem:
         print("Erro ao classificar intenção:", e)
         return "neutro"
 
-
 # =========================
 # 4) GERAÇÃO (LLM)
 # =========================
@@ -208,23 +231,25 @@ Mensagem original:
 
 Agora gere a resposta final no FORMATO OBRIGATÓRIO.
 """
+
+    max_tokens = MAX_TOKENS_MEMO if intent == "memorando_estrategico" else MAX_TOKENS_DEFAULT
+
     r = client.responses.create(
         model=MODEL,
         temperature=TEMP,
-        max_output_tokens=MAX_TOKENS,
+        max_output_tokens=max_tokens,
         input=[
             {"role": "system", "content": SYSTEM_BASE},
             {"role": "user", "content": user_instruction},
         ],
     )
+
     out = (getattr(r, "output_text", "") or "").strip()
     return out or "Não consegui gerar a resposta agora. Pode tentar novamente?"
-
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
 
 @app.post("/whatsapp")
 async def whatsapp_webhook(request: Request):
