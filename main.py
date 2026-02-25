@@ -29,17 +29,25 @@ if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
 
 # ========= Dedupe básico (evita duplicar envios) =========
 SEEN = {}  # {MessageSid: timestamp}
-SEEN_TTL_SECONDS = 60 * 10  # 10 min
+SEEN_TTL_SECONDS = 60 * 60  # [PROD] 60 min (antes: 10 min)
 
 def _seen_recently(message_sid: str) -> bool:
+    """Idempotência simples em memória.
+    Importante: some se o serviço reiniciar, mas reduz MUITO duplicação por retry."""
     if not message_sid:
         return False
+
     now = time.time()
-    old = [k for k, ts in SEEN.items() if now - ts > SEEN_TTL_SECONDS]
-    for k in old:
-        SEEN.pop(k, None)
+
+    # [PROD] limpeza por TTL
+    # evita crescer infinito e cobre retries mais tardios
+    expired = [sid for sid, ts in SEEN.items() if (now - ts) > SEEN_TTL_SECONDS]
+    for sid in expired:
+        SEEN.pop(sid, None)
+
     if message_sid in SEEN:
         return True
+
     SEEN[message_sid] = now
     return False
 
@@ -287,13 +295,31 @@ def send_whatsapp(to_number: str, text: str) -> None:
     except Exception as e:
         print("Erro ao enviar via Twilio:", e)
 
-def process_and_send(from_number: str, original_text: str) -> None:
+def process_and_send(from_number: str, original_text: str, message_sid: str = "") -> None:
+    # [PROD] logs mínimos e latência
+    job_start = time.time()
+    words = len((original_text or "").split())
+
     try:
         intent = classificar_intencao(original_text)
+
+        openai_start = time.time()
         out = gerar_versoes(original_text, intent=intent)
+        openai_latency = time.time() - openai_start
+
         send_whatsapp(from_number, out + FOOTER)
+
+        total = time.time() - job_start
+        print(
+            f"[revisaai] sid={message_sid or '-'} intent={intent} words={words} "
+            f"openai_s={openai_latency:.2f} total_s={total:.2f}"
+        )
+
     except Exception as e:
-        print("Erro no background:", e)
+        total = time.time() - job_start
+        print(
+            f"[revisaai] sid={message_sid or '-'} ERROR words={words} total_s={total:.2f} err={e}"
+        )
         send_whatsapp(from_number, "Tive um problema ao revisar sua mensagem 😕 Pode tentar novamente em alguns segundos?")
 
 @app.get("/health")
@@ -308,14 +334,14 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     from_number = (form.get("From") or "").strip()
     message_sid = (form.get("MessageSid") or "").strip()
 
-    # dedupe
+    # [PROD] dedupe antes de qualquer coisa (já estava certo)
     if _seen_recently(message_sid):
         twiml = MessagingResponse()
         return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
     twiml = MessagingResponse()
 
-    # Onboarding
+    # Onboarding (não mexi)
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Eu sou o RevisaAi.\n\n"
@@ -324,7 +350,10 @@ async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
         )
         return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
-    # ACK imediato + background
+    # ACK imediato + background (não mexi)
     twiml.message("⏳ Revisando… já te devolvo.")
-    background_tasks.add_task(process_and_send, from_number, body)
+
+    # [PROD] passa MessageSid pro log
+    background_tasks.add_task(process_and_send, from_number, body, message_sid)
+
     return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
