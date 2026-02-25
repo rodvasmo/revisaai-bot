@@ -48,8 +48,14 @@ Regras críticas:
   Prefira “Você consegue…”, “Você pode…”, ou formulações naturais equivalentes.
 - Não use termos acusatórios/infantilizantes: “prometeu”, “cobrador”.
 
+REGRA NOVA (FIRMEZA COM CONSEQUÊNCIA):
+- Se a mensagem original tiver uma condição + consequência (ex: “Se isso continuar…, vamos ter que…”),
+  preserve a lógica condicional e a consequência, apenas reduzindo o tom ameaçador.
+- Não “neutralize” removendo a condição. Mantenha firmeza madura.
+
 Hierarquia:
 - A Versão recomendada deve ser a mais equilibrada e madura (puxada para o lado diplomático), sem soar passiva.
+- Em mensagens com pressão, a Versão recomendada deve manter direção e consequência (sem ameaça).
 
 Formato obrigatório:
 
@@ -273,8 +279,8 @@ async def whatsapp_webhook(request: Request):
     if msg in ("", "oi", "olá", "ola", "hello", "hi"):
         twiml.message(
             "👋 Eu sou o RevisaAi.\n\n"
-            "Me envie uma mensagem antes de mandar no trabalho.\n"
-            "Eu devolvo uma versão mais clara e madura."
+            "Se a mensagem é importante, vale revisar antes de enviar.\n"
+            "Manda aqui."
         )
         print("TwiML:", str(twiml))
         return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
