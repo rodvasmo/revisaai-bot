@@ -1,8 +1,10 @@
 import os
 import re
-from fastapi import FastAPI, Request
+import time
+from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import Response
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.rest import Client as TwilioClient
 from openai import OpenAI
 
 app = FastAPI()
@@ -15,6 +17,32 @@ MAX_TOKENS_DEFAULT = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS", "650"))
 MAX_TOKENS_MEMO = int(os.getenv("OPENAI_MAX_OUTPUT_TOKENS_MEMO", "1100"))
 
 FOOTER = "\n\nSe quiser, revise a próxima comigo também."
+
+# ========= Twilio Outbound (para enviar depois) =========
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")  # ex: "whatsapp:+14155238886" (sandbox)
+
+twilio_client = None
+if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+    twilio_client = TwilioClient(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+
+# ========= Dedupe básico (evita duplicar envios) =========
+SEEN = {}  # {MessageSid: timestamp}
+SEEN_TTL_SECONDS = 60 * 10  # 10 min
+
+def _seen_recently(message_sid: str) -> bool:
+    if not message_sid:
+        return False
+    now = time.time()
+    old = [k for k, ts in SEEN.items() if now - ts > SEEN_TTL_SECONDS]
+    for k in old:
+        SEEN.pop(k, None)
+    if message_sid in SEEN:
+        return True
+    SEEN[message_sid] = now
+    return False
+
 
 # =========================
 # 1) BASE STYLE (GLOBAL)
@@ -52,8 +80,6 @@ REGRA (FIRMEZA COM CONSEQUÊNCIA):
 - Se a mensagem original tiver condição + consequência (ex: “Se isso continuar…, vamos ter que…”),
   preserve a estrutura condicional e a consequência.
 - Reduza apenas o tom ameaçador; NÃO dilua para linguagem genérica.
-  Proibido na Versão recomendada: “para garantir que tudo funcione bem”, “reavaliar como estamos distribuindo”.
-  Prefira formulações executivas: “precisaremos rever responsabilidades”, “para assegurar execução/entrega”.
 
 Hierarquia:
 - A Versão recomendada deve ser a mais equilibrada e madura (puxada para o lado diplomático), sem soar passiva.
@@ -104,95 +130,63 @@ Voz:
   Reformule para: preparo, padrão, responsabilidade, decisão, execução, retrabalho.
 
 Estrutura (Versão recomendada):
-- 2–3 parágrafos curtos, com sequência lógica:
-  1) Situação objetiva (atrasos/ritmo abaixo + repetição de alinhamentos, se existir).
-  2) O que precisa mudar (prioridade, preparo para reuniões, decisão sem retrabalho).
-  3) Encaminhamento de execução (sem inventar prazos): deixar claro o que será cobrado daqui para frente.
+- 2–3 parágrafos curtos, com sequência lógica.
 - Pode passar de 2 frases, mas mantenha concisão.
 
 Regras:
-- Preserve fatos do texto original (atraso, repetição, reunião, decisões voltando).
+- Preserve fatos do texto original.
 - Não invente prazo, responsável, número, ou “próxima etapa” específica.
-- Não use lista longa; se usar bullets, no máximo 3 e bem curtos.
-""",
-    "consequencia": """
-Intenção detectada: CONDIÇÃO + CONSEQUÊNCIA (pressão executiva sem ameaça).
-
-Diretrizes:
-- Preserve a lógica: “Se X continuar/persistir, teremos/precisaremos Y”.
-- Mantenha firmeza madura; evite suavizar demais.
-- NÃO transforme em frase genérica/“consultoria”:
-  proibido: “reavaliar como estamos distribuindo”, “para garantir que tudo funcione bem”, “melhorar nossa eficiência”.
-- A Versão recomendada deve soar como liderança: consequência clara + racional (execução/entrega).
-- 1–2 frases.
-
-Exemplos de padrão aceitável (adapte ao texto):
-- “Se isso persistir, precisaremos rever responsabilidades para assegurar execução consistente.”
-- “Se esse padrão continuar, vamos revisar responsabilidades para garantir entrega no nível esperado.”
 """,
     "critica": """
 Intenção detectada: CRÍTICA / FEEDBACK sobre postura/atitude/abordagem.
 
 Diretrizes:
-- Eleve para uma formulação construtiva e orientada ao futuro (sem “RH speak”).
-- Mantenha firmeza calma; evite acusação pessoal crua.
-- Preserve o fato (ex: “na reunião de hoje”) se existir no original.
-- Evite palavras como “inadequado”, “não atendeu”, “expectativas”, “desconforto”.
+- Eleve para formulação construtiva e orientada ao futuro (sem “RH speak”).
+- Firmeza calma; evite acusação pessoal crua.
+- Preserve fatos (ex: “na reunião de hoje”) se existir no original.
 """,
     "cobranca_repetida": """
 Intenção detectada: COBRANÇA COM REPETIÇÃO / SEM AVANÇO.
 
 Diretrizes:
-- Preserve explicitamente o fato da repetição/ausência de avanço (“já falamos”, “3 vezes”, “continua igual”).
-- Evite permissividade na Versão recomendada (não use “poderíamos”, “você acha que podemos”, “seria possível”).
-- A Versão recomendada deve ser firme e madura, orientada a avanço, sem checklist e sem “framework executivo”.
-- Evite perguntas genéricas (“como podemos resolver essa questão?”). Prefira pedido natural de atualização/avanço.
+- Preserve repetição/sem avanço (“já falamos”, “3 vezes”, “continua igual”).
+- Evite permissividade na Versão recomendada.
+- Firme e madura, orientada a avanço, sem checklist.
 """,
     "cobranca_firme": """
 Intenção detectada: COBRANÇA FIRME (demora / ritmo / atraso).
 
 Diretrizes:
-- Preserve a constatação de atraso explicitamente.
-- Não apenas reescreva — adicione leve direcionamento para avanço.
-- Não invente prazo.
-- Não use checklist.
-- A Versão recomendada deve conter:
-  1) constatação de demora
-  2) impulso de ação maduro e calmo (ex: “vamos ajustar o ritmo”, “precisamos acelerar esse ponto”)
-
-Evite:
-- paráfrase vazia
-- tom agressivo
-- tom excessivamente permissivo
+- Preserve a constatação de demora.
+- Adicione leve direcionamento para avanço.
+- Não invente prazo. Sem checklist.
 """,
     "followup_externo": """
-Intenção detectada: FOLLOW-UP EXTERNO (entrevista, proposta, contrato, retorno).
+Intenção detectada: FOLLOW-UP EXTERNO.
 
 Diretrizes:
-- Preserve o tempo/fato (“semana passada”, “ainda não tive retorno”) se existir.
-- Peça atualização de forma natural, sem institucionalizar.
-- Evite “há alguma atualização disponível”.
+- Preserve tempo/fato (“semana passada”, “ainda não tive retorno”) se existir.
+- Peça atualização de forma natural.
 """,
     "pedido_interno": """
-Intenção detectada: PEDIDO INTERNO (ajuda, entrega, material, prioridade).
+Intenção detectada: PEDIDO INTERNO.
 
 Diretrizes:
-- Deixe claro o que você precisa e a prioridade.
-- Se houver prazo no original, preserve; se não houver, não invente.
-- Evite soar seco; mas não seja prolixo.
+- Deixe claro o que precisa e a prioridade.
+- Preserve prazos existentes; se não houver, não invente.
 """,
     "neutro": """
 Intenção detectada: NEUTRO / GERAL.
 
 Diretrizes:
-- Apenas refine para clareza e maturidade, preservando intenção e fatos.
+- Apenas refine para clareza e maturidade.
 """,
 }
 
 INTENT_LABELS = set(TYPE_GUIDES.keys())
 
 # =========================
-# 2.5) GATILHOS DETERMINÍSTICOS
+# 2.5) GATILHO PARA TEXTO LONGO
 # =========================
 def _is_long_text(texto: str) -> bool:
     t = (texto or "").strip()
@@ -201,36 +195,12 @@ def _is_long_text(texto: str) -> bool:
     has_multi_sentences = len(re.findall(r"[.!?]", t)) >= 3
     return (words >= 90) or (paragraphs >= 2 and words >= 60) or (has_multi_sentences and words >= 80)
 
-def _is_conditional_consequence(texto: str) -> bool:
-    """
-    Detecta padrão de condição + consequência sem depender do classificador LLM.
-    Ex: "Se isso continuar..., vamos ter que..." / "Se isso persistir, precisaremos..."
-    """
-    t = (texto or "").strip().lower()
-
-    has_if = re.search(r"\bse\b", t) is not None
-    has_continue = any(x in t for x in ["continuar", "persistir", "seguir", "mantiver", "se mantiver", "ficar assim", "desse jeito"])
-    has_consequence = any(x in t for x in ["vamos ter que", "teremos que", "precisaremos", "vamos precisar", "vai ser preciso", "será preciso"])
-    has_responsibility = any(x in t for x in ["responsabilidad", "ownership", "quem faz o quê", "quem faz o que", "papéis", "papeis", "escopo", "alçadas", "alcadas"])
-
-    # Caso clássico que você testou (sem "responsabilidades" explícito)
-    classic = has_if and has_continue and has_consequence
-
-    # Caso com responsabilidade explícita
-    with_resp = has_if and has_consequence and has_responsibility
-
-    return classic or with_resp
-
 # =========================
-# 3) CLASSIFICAÇÃO SEMÂNTICA (LLM)
+# 3) CLASSIFICAÇÃO (LLM)
 # =========================
 def classificar_intencao(texto: str) -> str:
-    # Ordem importa: primeiro os gatilhos determinísticos
     if _is_long_text(texto):
         return "memorando_estrategico"
-
-    if _is_conditional_consequence(texto):
-        return "consequencia"
 
     prompt = f"""
 Classifique a intenção principal da mensagem abaixo em APENAS UMA destas opções:
@@ -243,11 +213,11 @@ Classifique a intenção principal da mensagem abaixo em APENAS UMA destas opç�
 
 Regras:
 - Responda com apenas a palavra da opção (sem pontuação, sem explicação).
-- Se houver repetição explícita (“já falamos”, “3 vezes”, “continua igual”), prefira cobranca_repetida.
-- Se houver atraso/demora/ritmo lento (sem repetição explícita), prefira cobranca_firme.
-- Se for pedir retorno de entrevista/proposta/contrato, prefira followup_externo.
-- Se for pedido interno de ajuda/entrega, prefira pedido_interno.
-- Se for feedback sobre postura/atitude, prefira critica.
+- Se houver repetição explícita, prefira cobranca_repetida.
+- Se houver demora/atraso sem repetição, prefira cobranca_firme.
+- Se for entrevista/proposta/contrato, prefira followup_externo.
+- Se for pedido interno, prefira pedido_interno.
+- Se for postura/atitude, prefira critica.
 
 Mensagem:
 {texto}
@@ -298,15 +268,50 @@ Agora gere a resposta final no FORMATO OBRIGATÓRIO.
     out = (getattr(r, "output_text", "") or "").strip()
     return out or "Não consegui gerar a resposta agora. Pode tentar novamente?"
 
+# =========================
+# 5) ENVIO ASSÍNCRONO VIA TWILIO
+# =========================
+def send_whatsapp(to_number: str, text: str) -> None:
+    if not twilio_client:
+        print("Twilio não configurado (SID/TOKEN).")
+        return
+    if not TWILIO_WHATSAPP_FROM:
+        print("TWILIO_WHATSAPP_FROM não configurado.")
+        return
+    try:
+        twilio_client.messages.create(
+            from_=TWILIO_WHATSAPP_FROM,
+            to=to_number,
+            body=text,
+        )
+    except Exception as e:
+        print("Erro ao enviar via Twilio:", e)
+
+def process_and_send(from_number: str, original_text: str) -> None:
+    try:
+        intent = classificar_intencao(original_text)
+        out = gerar_versoes(original_text, intent=intent)
+        send_whatsapp(from_number, out + FOOTER)
+    except Exception as e:
+        print("Erro no background:", e)
+        send_whatsapp(from_number, "Tive um problema ao revisar sua mensagem 😕 Pode tentar novamente em alguns segundos?")
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 @app.post("/whatsapp")
-async def whatsapp_webhook(request: Request):
+async def whatsapp_webhook(request: Request, background_tasks: BackgroundTasks):
     form = await request.form()
     body = (form.get("Body") or "").strip()
     msg = body.lower()
+    from_number = (form.get("From") or "").strip()
+    message_sid = (form.get("MessageSid") or "").strip()
+
+    # dedupe
+    if _seen_recently(message_sid):
+        twiml = MessagingResponse()
+        return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
     twiml = MessagingResponse()
 
@@ -317,16 +322,9 @@ async def whatsapp_webhook(request: Request):
             "Se a mensagem é importante, vale revisar antes de enviar.\n"
             "Manda aqui."
         )
-        print("TwiML:", str(twiml))
         return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
 
-    try:
-        intent = classificar_intencao(body)
-        out = gerar_versoes(body, intent=intent)
-        twiml.message(out + FOOTER)
-    except Exception as e:
-        print("Erro ao processar:", e)
-        twiml.message("Tive um problema ao revisar sua mensagem 😕 Pode tentar novamente em alguns segundos?")
-
-    print("TwiML:", str(twiml))
+    # ACK imediato + background
+    twiml.message("⏳ Revisando… já te devolvo.")
+    background_tasks.add_task(process_and_send, from_number, body)
     return Response(content=str(twiml), media_type="text/xml; charset=utf-8")
