@@ -96,6 +96,23 @@ Diretrizes:
 - A Versão recomendada deve ser firme e madura, orientada a avanço, sem checklist e sem “framework executivo”.
 - Evite perguntas genéricas (“como podemos resolver essa questão?”). Prefira pedido natural de atualização/avanço.
 """,
+    "cobranca_firme": """
+Intenção detectada: COBRANÇA FIRME (demora / ritmo / atraso).
+
+Diretrizes:
+- Preserve a constatação de atraso explicitamente.
+- Não apenas reescreva — adicione leve direcionamento para avanço.
+- Não invente prazo.
+- Não use checklist.
+- A Versão recomendada deve conter:
+  1) constatação de demora
+  2) impulso de ação maduro e calmo (ex: “vamos ajustar o ritmo”, “precisamos acelerar esse ponto”)
+
+Evite:
+- paráfrase vazia
+- tom agressivo
+- tom excessivamente permissivo
+""",
     "followup_externo": """
 Intenção detectada: FOLLOW-UP EXTERNO (entrevista, proposta, contrato, retorno).
 
@@ -120,7 +137,14 @@ Diretrizes:
 """,
 }
 
-INTENT_LABELS = {"critica", "cobranca_repetida", "followup_externo", "pedido_interno", "neutro"}
+INTENT_LABELS = {
+    "critica",
+    "cobranca_repetida",
+    "cobranca_firme",
+    "followup_externo",
+    "pedido_interno",
+    "neutro",
+}
 
 
 # =========================
@@ -128,22 +152,25 @@ INTENT_LABELS = {"critica", "cobranca_repetida", "followup_externo", "pedido_int
 # =========================
 def classificar_intencao(texto: str) -> str:
     """
-    Chamada 1 (barata/rápida): classifica intenção semanticamente.
-    Retorna 1 label dentre: critica, cobranca_repetida, followup_externo, pedido_interno, neutro
+    Chamada 1: classifica intenção semanticamente.
+    Retorna 1 label dentre:
+    critica, cobranca_repetida, cobranca_firme, followup_externo, pedido_interno, neutro
     """
     prompt = f"""
 Classifique a intenção principal da mensagem abaixo em APENAS UMA destas opções:
 - critica
 - cobranca_repetida
+- cobranca_firme
 - followup_externo
 - pedido_interno
 - neutro
 
 Regras:
 - Responda com apenas a palavra da opção (sem pontuação, sem explicação).
-- Se houver repetição/“continua igual”/“já foi pedido”/“3 vezes”, prefira cobranca_repetida.
+- Se houver repetição explícita (“já falamos”, “3 vezes”, “continua igual”), prefira cobranca_repetida.
+- Se houver atraso/demora/ritmo lento (sem repetição explícita), prefira cobranca_firme.
 - Se for pedir retorno de entrevista/proposta/contrato, prefira followup_externo.
-- Se for pedido de ajuda/entrega, prefira pedido_interno.
+- Se for pedido interno de ajuda/entrega, prefira pedido_interno.
 - Se for feedback sobre postura/atitude, prefira critica.
 
 Mensagem:
@@ -155,12 +182,11 @@ Mensagem:
             temperature=0.0,
             max_output_tokens=20,
             input=[
-                {"role": "system", "content": "Você é um classificador. Siga as instruções e responda apenas o rótulo."},
+                {"role": "system", "content": "Você é um classificador. Responda apenas o rótulo exato."},
                 {"role": "user", "content": prompt},
             ],
         )
         label = (getattr(r, "output_text", "") or "").strip().lower()
-        # limpa casos tipo "critica\n" ou "critica."
         label = re.sub(r"[^a-z_]+", "", label)
         return label if label in INTENT_LABELS else "neutro"
     except Exception as e:
@@ -222,7 +248,6 @@ async def whatsapp_webhook(request: Request):
         intent = classificar_intencao(body)
         out = gerar_versoes(body, intent=intent)
         twiml.message(out + FOOTER)
-
     except Exception as e:
         print("Erro ao processar:", e)
         twiml.message("Tive um problema ao revisar sua mensagem 😕 Pode tentar novamente em alguns segundos?")
